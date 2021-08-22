@@ -22,7 +22,7 @@ namespace LordAshes
         {
             foreach (StatMessaging.Change change in changes)
             {
-                Debug.Log("Change For " + change.cid + ", Type: " + change.action + ", From: " + change.previous + ", To: " + change.value);
+                Debug.Log("Invisibility Plugin: Change For " + change.cid + ", Type: " + change.action + ", From: " + change.previous + ", To: " + change.value);
                 ApplyVisibility(change);            
             }
         }
@@ -33,7 +33,7 @@ namespace LordAshes
             CreaturePresenter.TryGetAsset(change.cid, out asset);
             if (asset != null)
             {
-                UnityEngine.Debug.Log("Invisibility Plugin: Creature : " + asset.Creature.Name + " : " + asset.Creature.CreatureId +" : Controlled? " + LocalClient.HasControlOfCreature(change.cid));
+                UnityEngine.Debug.Log("Invisibility Plugin: Creature : " + asset.Creature.Name + " : " + asset.Creature.CreatureId +" : " + change.action + " : Controlled? " + LocalClient.HasControlOfCreature(change.cid));
 
                 VisibleState visible = VisibleState.visibleNot;
                 if ((change.action == StatMessaging.ChangeType.removed))
@@ -65,11 +65,20 @@ namespace LordAshes
                     {
                         // Save base loader texture
                         Debug.Log("Invisibility Plugin: Storing Base Loader Texture");
-                        invisible.Add(change.cid, asset.BaseLoader.LoadedAsset.GetComponent<MeshRenderer>().material.mainTexture);
-                        // Apply invisibility texture to the base
-                        Debug.Log("Invisibility Plugin: Changing Base Loader Texture");
-                        asset.BaseLoader.LoadedAsset.GetComponent<MeshRenderer>().material.mainTexture = FileAccessPlugin.Image.LoadTexture(InvisibilityPlugin.Guid + "\\Invisibility.png");
+                        try
+                        {
+                            invisible.Add(change.cid, asset.BaseLoader.LoadedAsset.GetComponent<MeshRenderer>().material.mainTexture);
+                        }
+                        catch(System.Exception)
+                        {
+                            Debug.Log("Invisibility Plugin: Mini Not Yet Ready");
+                            StatMessaging.Reset(InvisibilityPlugin.Guid);
+                            return;
+                        }
                     }
+                    // Apply invisibility texture to the base
+                    Debug.Log("Invisibility Plugin: Changing Base Loader Texture");
+                    asset.BaseLoader.LoadedAsset.GetComponent<MeshRenderer>().material.mainTexture = FileAccessPlugin.Image.LoadTexture(InvisibilityPlugin.Guid + "\\Invisibility.png");
                 }
 
                 Debug.Log("Invisibility Plugin: Getting Renderer");
@@ -93,6 +102,7 @@ namespace LordAshes
                 {
                     if(obj.name=="Indicator")
                     {
+                        UnityEngine.Debug.Log("Invisibility Plugin: Turned Indicator To " + visible);
                         obj.enabled = (visible == VisibleState.visibleNot) ? false : true;
                         break;
                     }

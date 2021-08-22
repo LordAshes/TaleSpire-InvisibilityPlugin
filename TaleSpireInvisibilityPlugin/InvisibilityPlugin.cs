@@ -6,17 +6,6 @@ using BepInEx.Configuration;
 using Bounce.Unmanaged;
 using UnityEngine;
 
-/// <summary>
-/// 
-/// Notes:
-/// 
-/// 1. Try to keep this main page simple with just the Unity/TS methods like Awake() and Update() methods
-/// 2. Place your processing code in class specific files or a general class file like the sample Handler.cs file
-/// 3. You can make your additional class file part of the main plugin class by making them "public partial class TemplatePlugin : BaseUnityPlugin"
-///    (See the sample Handler.cs and/or Unity.cs files for an example)
-/// 
-/// </summary>
-
 namespace LordAshes
 {
     [BepInPlugin(Guid, Name, Version)]
@@ -28,7 +17,7 @@ namespace LordAshes
         // Plugin info
         public const string Name = "Invisibility Plug-In";             
         public const string Guid = "org.lordashes.plugins.invisibility";
-        public const string Version = "1.0.0.0";                        
+        public const string Version = "1.0.1.0";                        
 
         // Configuration
         private ConfigEntry<KeyboardShortcut> triggerInvisibility { get; set; }
@@ -37,9 +26,7 @@ namespace LordAshes
         // Invisible Assets
         private Dictionary<CreatureGuid,Texture> invisible = new Dictionary<CreatureGuid,Texture>();
 
-        private NGuid _radialTarget = NGuid.Empty;
-
-        private bool subscribed = false;
+        private System.Guid subscription = System.Guid.Empty;
 
         /// <summary>
         /// Function for initializing plugin
@@ -65,12 +52,12 @@ namespace LordAshes
                     Action = (mmi2, obj2) =>
                     {
                         CreatureBoardAsset asset;
-                        CreaturePresenter.TryGetAsset(new CreatureGuid(_radialTarget), out asset);
+                        CreaturePresenter.TryGetAsset(new CreatureGuid(RadialUI.RadialUIPlugin.GetLastRadialTargetCreature()), out asset);
                         Debug.Log("GM Hiding " + asset.Creature.Name + " (" + asset.Creature.CreatureId + ")");
                         if (asset != null) { CreatureManager.SetCreatureExplicitHideState(asset.Creature.CreatureId, !asset.Creature.IsExplicitlyHidden); }
                     },
                     CloseMenuOnActivate = true
-                }, (m, r) => { _radialTarget = r; return true; });
+                }, (m, r) => { return true; });
             }
 
             // Add replacement Hide menu in the root character radial menu
@@ -81,12 +68,12 @@ namespace LordAshes
                 Action = (mmi1, obj1) =>
                 {
                     CreatureBoardAsset asset;
-                    CreaturePresenter.TryGetAsset(new CreatureGuid(_radialTarget), out asset);
+                    CreaturePresenter.TryGetAsset(new CreatureGuid(RadialUI.RadialUIPlugin.GetLastRadialTargetCreature()), out asset);
                     Debug.Log("Player Hiding " + asset.Creature.Name + " (" + asset.Creature.CreatureId + ")");
                     if (asset != null) { SetRequest(asset.Creature.CreatureId); }
                 },
                 CloseMenuOnActivate = true
-            },(m,r)=> { _radialTarget = r; return true; });
+            },(m,r)=> { return LocalClient.CanControlCreature(new CreatureGuid(r)); });
 
             Utility.PostOnMainPage(this.GetType());
         }
@@ -99,16 +86,16 @@ namespace LordAshes
         {
             if (Utility.isBoardLoaded())
             {
-                if (!subscribed)
+                if (subscription==System.Guid.Empty)
                 {
                     Debug.Log("Invisibility Plugin: Subscribing To Invisibility Plugin Stat Messages...");
-                    subscribed = true;
-                    StatMessaging.Subscribe(InvisibilityPlugin.Guid, HandleRequest);
+                    StatMessaging.Reset(InvisibilityPlugin.Guid);
+                    subscription = StatMessaging.Subscribe(InvisibilityPlugin.Guid, HandleRequest);
                 }
 
                 if (Utility.StrictKeyCheck(triggerInvisibility.Value))
                 {
-                    Debug.Log("Toggling Invisibility State...");
+                    Debug.Log("Invisibility Plugin: Toggling Invisibility State...");
                     if (LocalClient.SelectedCreatureId != null)
                     {
                         SetRequest(LocalClient.SelectedCreatureId);
@@ -117,17 +104,25 @@ namespace LordAshes
 
                 if (Utility.StrictKeyCheck(triggerRefresh.Value))
                 {
-                    Debug.Log("Refreshing Invisibility States...");
+                    Debug.Log("Invisibility Plugin: Refreshing Invisibility States...");
                     foreach (CreatureBoardAsset asset in CreaturePresenter.AllCreatureAssets)
                     {
                         ApplyVisibility(new StatMessaging.Change()
                         {
                             cid = asset.Creature.CreatureId,
-                            action = (invisible.ContainsKey(asset.Creature.CreatureId)) ? StatMessaging.ChangeType.modified : StatMessaging.ChangeType.removed,
+                            action = (StatMessaging.ReadInfo(asset.Creature.CreatureId, InvisibilityPlugin.Guid)!="") ? StatMessaging.ChangeType.modified : StatMessaging.ChangeType.removed,
                             key = InvisibilityPlugin.Guid,
                             value = "Refresh:" + DateTime.UtcNow
                         }); ;
                     }
+                }
+            }
+            else
+            {
+                if (subscription!=System.Guid.Empty)
+                {
+                    StatMessaging.Unsubscribe(subscription);
+                    subscription = System.Guid.Empty;
                 }
             }
         }
@@ -136,7 +131,7 @@ namespace LordAshes
         {
             CreatureBoardAsset asset;
             CreaturePresenter.TryGetAsset(new CreatureGuid(RadialUI.RadialUIPlugin.GetLastRadialTargetCreature()), out asset);
-            Debug.Log("Player Hiding " + asset.Creature.Name + " (" + asset.Creature.CreatureId + ")");
+            Debug.Log("Invisibility Plugin: Player Hiding " + asset.Creature.Name + " (" + asset.Creature.CreatureId + ")");
             if (asset != null) { SetRequest(asset.Creature.CreatureId); }
         }
 
@@ -144,7 +139,7 @@ namespace LordAshes
         {
             CreatureBoardAsset asset;
             CreaturePresenter.TryGetAsset(new CreatureGuid(RadialUI.RadialUIPlugin.GetLastRadialTargetCreature()), out asset);
-            Debug.Log("GM Hiding " + asset.Creature.Name + " (" + asset.Creature.CreatureId + ")");
+            Debug.Log("Invisibility Plugin: GM Hiding " + asset.Creature.Name + " (" + asset.Creature.CreatureId + ")");
             if (asset != null) { CreatureManager.SetCreatureExplicitHideState(asset.Creature.CreatureId, !asset.Creature.IsExplicitlyHidden); }
         }
     }
