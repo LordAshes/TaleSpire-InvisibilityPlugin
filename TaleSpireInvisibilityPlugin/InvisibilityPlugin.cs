@@ -17,7 +17,7 @@ namespace LordAshes
         // Plugin info
         public const string Name = "Invisibility Plug-In";             
         public const string Guid = "org.lordashes.plugins.invisibility";
-        public const string Version = "1.0.1.0";                        
+        public const string Version = "1.0.2.0";                        
 
         // Configuration
         private ConfigEntry<KeyboardShortcut> triggerInvisibility { get; set; }
